@@ -3,8 +3,9 @@
 .env.local
 .env.*.local
 
-# Firebase key (keep your firebase-key.json out of git)
+# Firebase key (keep credentials out of git)
 firebase-key.json
+firebasekey.json
 *-key.json
 
 # Uploads
