@@ -3,6 +3,7 @@
   "private": true,
   "description": "Hackathon project: Intelligent Emergency Response System",
   "scripts": {
-    "sync-env": "node scripts/sync-env-to-mobile.js"
+    "sync-env": "node scripts/sync-env-to-mobile.js",
+    "seed": "node server/scripts/seed.js"
   }
 }

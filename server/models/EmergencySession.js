@@ -18,6 +18,24 @@ const timelineEventSchema = new mongoose.Schema({
 const emergencySessionSchema = new mongoose.Schema({
   sessionId: { type: String, default: () => uuidv4() },
   victimName: { type: String, required: true },
+  victimDetails: {
+    phone: String,
+    altPhone: String,
+    email: String,
+    address: String,
+    age: Number,
+    bloodGroup: String,
+    medical: String,
+    registeredDate: String,
+    previousSOS: { type: Number, default: 0 },
+  },
+  guardianDetails: {
+    name: String,
+    relation: String,
+    phone: String,
+    email: String,
+  },
+  policeEmail: String,
   status: { type: String, enum: ['ACTIVE', 'RESOLVED'], default: 'ACTIVE' },
   contextType: {
     type: String,

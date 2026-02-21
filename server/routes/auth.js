@@ -6,12 +6,22 @@ const router = express.Router();
 router.post('/register', async (req, res) => {
   try {
     const { name, phone, role } = req.body;
+    if (!name || !phone || !role) {
+      return res.status(400).json({ message: 'name, phone, and role are required' });
+    }
+    const validRoles = ['victim', 'guardian', 'pcr'];
+    if (!validRoles.includes(role)) {
+      return res.status(400).json({ message: 'role must be victim, guardian, or pcr' });
+    }
     const user = new User({ name, phone, role });
     await user.save();
     console.log('[auth] User registered:', phone);
     res.json(user);
   } catch (err) {
     console.error('[auth] Register error:', err);
+    if (err.code === 11000) {
+      return res.status(409).json({ message: 'Phone number already registered' });
+    }
     res.status(500).json({ message: err.message });
   }
 });
@@ -19,6 +29,9 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
   try {
     const { phone } = req.body;
+    if (!phone) {
+      return res.status(400).json({ message: 'phone is required' });
+    }
     const user = await User.findOne({ phone });
     if (!user) {
       console.log('[auth] Login failed - user not found:', phone);

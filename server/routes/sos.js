@@ -8,18 +8,33 @@ const mail = require('../services/mail');
 function sosRoutes(io) {
   const router = express.Router();
 
+  const validContexts = ['physical_attack', 'forced_vehicle', 'medical', 'unsafe', 'unsure'];
+
   router.post('/start', async (req, res) => {
     try {
-      const { victimName, contextType } = req.body;
-      const session = new EmergencySession({ victimName, contextType });
+      const { victimName, contextType, guardianEmail, guardianEmails, policeEmail } = req.body;
+      if (!victimName || typeof victimName !== 'string' || !victimName.trim()) {
+        return res.status(400).json({ message: 'victimName is required' });
+      }
+      if (contextType && !validContexts.includes(contextType)) {
+        return res.status(400).json({ message: 'contextType must be one of: ' + validContexts.join(', ') });
+      }
+      const emails = [];
+      if (guardianEmail && typeof guardianEmail === 'string' && guardianEmail.trim()) emails.push(guardianEmail.trim());
+      if (Array.isArray(guardianEmails)) guardianEmails.forEach((e) => e && typeof e === 'string' && e.trim() && emails.push(e.trim()));
+      const session = new EmergencySession({
+        victimName: victimName.trim(),
+        contextType: contextType || undefined,
+        guardianDetails: guardianEmail ? { email: guardianEmail.trim() } : undefined,
+        policeEmail: policeEmail && typeof policeEmail === 'string' ? policeEmail.trim() : undefined,
+      });
       session.timelineEvents.push({ event: 'SOS triggered' });
       await session.save();
       io.emit('new_sos', session);
       const title = 'SOS Alert';
       const body = `${victimName} — ${contextType || 'Emergency'}`;
       fcm.sendToTopic('guardians', { title, body }, { sessionId: session.sessionId }).catch(() => {});
-      const config = require('../config');
-      mail.send(config.GUARDIAN_ALERT_EMAIL || '', title, body).catch(() => {});
+      mail.sendAlertToEmails(emails, title, body).catch(() => {});
       console.log('[sos] New SOS started:', session.sessionId, victimName);
       res.json({ sessionId: session.sessionId, _id: session._id });
     } catch (err) {
@@ -32,13 +47,18 @@ function sosRoutes(io) {
     try {
       const { sessionId } = req.params;
       const { lat, lng, speed, direction, audioLevel } = req.body;
+      const numLat = Number(lat);
+      const numLng = Number(lng);
+      if (lat === undefined || lat === null || lng === undefined || lng === null || isNaN(numLat) || isNaN(numLng)) {
+        return res.status(400).json({ message: 'lat and lng are required and must be valid numbers (0 is valid)' });
+      }
       const session = await EmergencySession.findOne({ sessionId });
       if (!session) {
         return res.status(404).json({ message: 'Session not found' });
       }
-      const newLoc = { lat, lng, speed, direction, audioLevel, timestamp: new Date() };
+      const newLoc = { lat: numLat, lng: numLng, speed, direction, audioLevel, timestamp: new Date() };
       session.locations.push(newLoc);
-      const result = riskEngine.calculate(session, { lat, lng, speed, direction, audioLevel });
+      const result = riskEngine.calculate(session, { lat: numLat, lng: numLng, speed, direction, audioLevel });
       session.riskScore = result.riskScore;
       session.riskLevel = result.riskLevel;
       await session.save();
@@ -83,6 +103,21 @@ function sosRoutes(io) {
     }
   });
 
+  router.get('/sessions', async (req, res) => {
+    try {
+      const { status } = req.query;
+      const filter = status === 'active' ? { status: 'ACTIVE' }
+        : status === 'resolved' ? { status: 'RESOLVED' }
+        : {};
+      const sessions = await EmergencySession.find(filter)
+        .sort({ startTime: -1 });
+      res.json(sessions);
+    } catch (err) {
+      console.error('[sos] Sessions error:', err);
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   router.get('/report/:sessionId', async (req, res) => {
     try {
       const { sessionId } = req.params;
@@ -114,7 +149,8 @@ function sosRoutes(io) {
       doc.moveDown();
       doc.fontSize(14).text('TIMELINE OF EVENTS:');
       session.timelineEvents.forEach(e => {
-        doc.fontSize(11).text('• ' + e.event + ' — ' + new Date(e.timestamp).toLocaleString());
+        const timeStr = e.timestamp ? new Date(e.timestamp).toLocaleString() : 'N/A';
+        doc.fontSize(11).text('• ' + (e.event || 'Event') + ' — ' + timeStr);
       });
 
       doc.end();

@@ -1,5 +1,7 @@
 const EmergencySession = require('../models/EmergencySession');
 const riskEngine = require('./riskEngine');
+const fcm = require('./fcm');
+const mail = require('./mail');
 
 function startTamperWatch(io) {
   setInterval(async () => {
@@ -30,11 +32,12 @@ function startTamperWatch(io) {
           });
 
           io.emit('session_update', session);
-          const fcm = require('./fcm');
           fcm.sendToTopic('guardians', {
             title: 'Tamper detected',
             body: `${session.victimName} — device offline`
           }, { sessionId: session.sessionId }).catch(() => {});
+          const emails = session.guardianDetails?.email ? [session.guardianDetails.email] : [];
+          mail.sendAlertToEmails(emails, 'Tamper detected', `${session.victimName} — device offline`).catch(() => {});
           console.log('[tamperDetector] Tamper alert emitted for session:', session.sessionId);
         }
       }

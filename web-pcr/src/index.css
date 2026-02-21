@@ -1,3 +1,123 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto+Mono:wght@400;500&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 240 27% 14%;
+    --foreground: 0 0% 100%;
+
+    --card: 220 47% 16%;
+    --card-foreground: 0 0% 100%;
+
+    --popover: 220 47% 16%;
+    --popover-foreground: 0 0% 100%;
+
+    --primary: 350 80% 59%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 215 73% 22%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 240 10% 20%;
+    --muted-foreground: 240 8% 58%;
+
+    --accent: 38 100% 50%;
+    --accent-foreground: 0 0% 8%;
+
+    --destructive: 350 80% 59%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 30% 22%;
+    --input: 220 30% 22%;
+    --ring: 350 80% 59%;
+
+    --radius: 0.5rem;
+
+    --success: 160 60% 40%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 100% 50%;
+    --warning-foreground: 0 0% 8%;
+
+    --danger: 350 80% 59%;
+    --danger-foreground: 0 0% 100%;
+
+    --info: 210 80% 55%;
+    --info-foreground: 0 0% 100%;
+
+    --sidebar-background: 240 30% 12%;
+    --sidebar-foreground: 0 0% 90%;
+    --sidebar-primary: 350 80% 59%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 47% 16%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 220 30% 22%;
+    --sidebar-ring: 350 80% 59%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-family: 'Inter', sans-serif;
+  }
+
+  .font-mono {
+    font-family: 'Roboto Mono', monospace;
+  }
+}
+
+@layer utilities {
+  .pulse-dot {
+    animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+  }
+
+  @keyframes pulse-ring {
+    0% {
+      box-shadow: 0 0 0 0 hsl(350 80% 59% / 0.7);
+    }
+    70% {
+      box-shadow: 0 0 0 10px hsl(350 80% 59% / 0);
+    }
+    100% {
+      box-shadow: 0 0 0 0 hsl(350 80% 59% / 0);
+    }
+  }
+
+  .glow-red {
+    box-shadow: 0 0 20px hsl(350 80% 59% / 0.3), 0 0 40px hsl(350 80% 59% / 0.1);
+  }
+
+  .glow-green {
+    box-shadow: 0 0 15px hsl(160 60% 40% / 0.3);
+  }
+
+  .glow-warning {
+    box-shadow: 0 0 15px hsl(38 100% 50% / 0.3);
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(220 30% 22%) transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: hsl(220 30% 22%);
+    border-radius: 3px;
+  }
+}

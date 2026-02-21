@@ -6,14 +6,16 @@ function calculate(session, newLocation) {
   else if (session.contextType === 'medical') score += 10;
   else if (session.contextType === 'unsafe') score += 15;
 
-  const { speed, direction, audioLevel } = newLocation;
-  const locations = session.locations;
+  const { speed = 0, direction = 0, audioLevel = 0 } = newLocation || {};
+  const locations = session.locations || [];
 
   if (locations.length >= 1) {
     const prev = locations[locations.length - 1];
+    const prevSpeed = prev?.speed ?? 0;
+    const prevDir = prev?.direction ?? 0;
     if (speed > 50) score += 5;
-    if (Math.abs(speed - (prev.speed || 0)) > 15) score += 20;
-    if (Math.abs(direction - (prev.direction || 0)) > 60) score += 15;
+    if (Math.abs(speed - prevSpeed) > 15) score += 20;
+    if (Math.abs(direction - prevDir) > 60) score += 15;
   }
 
   if (audioLevel > 70) score += 20;
