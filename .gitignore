@@ -1,0 +1,20 @@
+# Environment (keep .env.example)
+.env
+.env.local
+.env.*.local
+
+# Firebase key (keep your firebase-key.json out of git)
+firebase-key.json
+*-key.json
+
+# Uploads
+uploads/
+
+# Dependencies
+node_modules/
+
+# Build / cache
+dist/
+.expo/
+*.log
+npm-debug.log*

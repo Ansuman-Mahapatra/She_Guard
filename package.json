@@ -1,0 +1,8 @@
+{
+  "name": "intelligent-emergency-response",
+  "private": true,
+  "description": "Hackathon project: Intelligent Emergency Response System",
+  "scripts": {
+    "sync-env": "node scripts/sync-env-to-mobile.js"
+  }
+}
