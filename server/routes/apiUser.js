@@ -65,4 +65,17 @@ router.post('/guardians', requireAuth, requireRole('victim'), (req, res) => {
   res.status(400).json({ message: 'Use guardian link-by-code or invite to add guardians' });
 });
 
+// POST /api/user/fcm-token
+router.post('/fcm-token', requireAuth, async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) return res.status(400).json({ message: 'token required' });
+    req.user.fcmToken = token;
+    await req.user.save();
+    res.json({ message: 'FCM token registered updated' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 module.exports = router;

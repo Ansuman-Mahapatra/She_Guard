@@ -1,11 +1,12 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { toast } from "sonner";
+import { Search } from "lucide-react";
 import type { Emergency } from "@/data/mockData";
-import { fetchAllSessions, resolveSession } from "@/lib/api";
+import { fetchAllSessions, resolveSession, fetchPoliceStats } from "@/lib/api";
 import { socket } from "@/lib/socket";
 import { sessionToEmergency, type BackendSession } from "@/lib/sessionToEmergency";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
-import TopStatsBar from "@/components/dashboard/TopStatsBar";
+import TopStatsBar, { type PoliceStats } from "@/components/dashboard/TopStatsBar";
 import EmergencyList from "@/components/dashboard/EmergencyList";
 import EmergencyDetail from "@/components/dashboard/EmergencyDetail";
 import MapView from "@/components/dashboard/MapView";
@@ -18,6 +19,8 @@ const sortBySeverity = (arr: Emergency[]) =>
 
 const Index = () => {
   const [emergencies, setEmergencies] = useState<Emergency[]>([]);
+  const [policeStats, setPoliceStats] = useState<PoliceStats | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -50,6 +53,15 @@ const Index = () => {
       .finally(() => {
         if (mounted) setLoading(false);
       });
+
+    // Load global statistics (On Duty, etc.)
+    fetchPoliceStats()
+      .then((data: PoliceStats) => {
+        if (mounted && data) {
+           setPoliceStats(data);
+        }
+      })
+      .catch(console.error);
 
     socket.on("new_sos", (session: BackendSession) => {
       if (mounted) {
@@ -109,25 +121,51 @@ const Index = () => {
     }
   };
 
+  const filteredEmergencies = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return emergencies;
+    return emergencies.filter((e) => 
+      e.victim.name?.toLowerCase().includes(q) ||
+      e.type.toLowerCase().includes(q) ||
+      e.id.toLowerCase().includes(q) ||
+      e.victim.phone?.toLowerCase().includes(q)
+    );
+  }, [emergencies, searchQuery]);
+
   return (
     <div className="flex flex-col h-screen bg-background overflow-hidden">
       <DashboardHeader />
 
       <div className="p-4 border-b border-border">
-        <TopStatsBar emergencies={emergencies} loading={loading} />
+        <TopStatsBar emergencies={emergencies} loading={loading} policeStats={policeStats} />
       </div>
 
       <div className="flex-1 flex overflow-hidden">
         {/* Left: Emergency List */}
         <div className="w-80 shrink-0 border-r border-border p-4 flex flex-col overflow-hidden">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-            Emergencies
-          </h2>
+          <div className="flex flex-col gap-2 mb-3">
+             <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+               Emergencies
+             </h2>
+             <div className="relative">
+               <div className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none">
+                 <Search className="w-4 h-4 text-muted-foreground" />
+               </div>
+               <input 
+                 type="text"
+                 placeholder="Search name, type, or ID..."
+                 value={searchQuery}
+                 onChange={(e) => setSearchQuery(e.target.value)}
+                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring pl-8"
+               />
+             </div>
+          </div>
+
           {error ? (
             <div className="text-sm text-destructive py-4">{error}</div>
           ) : (
             <EmergencyList
-              emergencies={emergencies}
+              emergencies={filteredEmergencies}
               selectedId={selectedId}
               onSelect={setSelectedId}
               loading={loading}

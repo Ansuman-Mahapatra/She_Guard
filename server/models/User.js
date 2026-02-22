@@ -22,6 +22,7 @@ const userSchema = new mongoose.Schema({
   phone: { type: String }, // required for victim/guardian
   email: { type: String },
   password: { type: String }, // hashed; required for guardian, optional for victim, required for pcr
+  googleId: { type: String }, // Google OAuth subject ID (sub), set on Google sign-in
   role: { type: String, enum: ['victim', 'guardian', 'pcr'], required: true },
 
   // Station details (for role = pcr)
@@ -54,6 +55,19 @@ const userSchema = new mongoose.Schema({
     email: { type: Boolean, default: true },
     sms: { type: Boolean, default: true },
     push: { type: Boolean, default: true },
+  },
+
+  // FCM Device Token for Push Notifications
+  fcmToken: { type: String },
+
+  // Location and Signal Tracking
+  lastKnownLocation: {
+    lat: { type: Number },
+    lng: { type: Number },
+    battery: { type: Number }, // 0 to 100
+    signalStrength: { type: Number }, // e.g. 0 to 4
+    status: { type: String, enum: ['online', 'offline', 'alert', 'yellow_alert'], default: 'offline' },
+    updatedAt: { type: Date }
   },
 
   // Status
