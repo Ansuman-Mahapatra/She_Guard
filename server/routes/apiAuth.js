@@ -442,6 +442,43 @@ router.post('/google', async (req, res) => {
   }
 });
 
+// POST /api/auth/prototype — hackathon bypass: name + role, no Google. Creates demo user instantly.
+router.post('/prototype', async (req, res) => {
+  try {
+    const { name, role } = req.body;
+    if (!name || !role) {
+      return res.status(400).json({ message: 'name and role are required' });
+    }
+    const validRoles = ['victim', 'guardian'];
+    if (!validRoles.includes(role)) {
+      return res.status(400).json({ message: 'role must be victim or guardian' });
+    }
+    const phone = `prototype-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+    const email = `proto-${phone}@sheguard.demo`;
+    const user = new User({
+      name: String(name).trim() || 'Prototype User',
+      phone,
+      email,
+      role,
+      emailVerified: true,
+    });
+    await user.save();
+    const { token, session, expiresAt } = await createSessionAndToken(user, `proto-${role}`);
+    res.json({
+      token,
+      _id: user._id,
+      name: user.name,
+      phone: user.phone,
+      email: user.email,
+      role: user.role,
+      sessionId: session._id,
+      expiresAt,
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // POST /api/auth/google-complete — complete Google signup with signupToken (from HTTPS redirect flow)
 router.post('/google-complete', async (req, res) => {
   try {
