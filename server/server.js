@@ -18,6 +18,7 @@ const apiCheckIn = require('./routes/apiCheckIn');
 const apiHeartbeat = require('./routes/apiHeartbeat');
 const apiGuardian = require('./routes/apiGuardian');
 const apiPolice = require('./routes/apiPolice');
+const { router: oauthRedirectRouter } = require('./routes/oauthRedirect');
 const { startTamperWatch } = require('./services/tamperDetector');
 const { startCron } = require('./jobs/cron');
 
@@ -52,6 +53,7 @@ mongoose.connect(MONGODB_URI)
   .catch(err => console.error('MongoDB connection error:', err));
 
 app.use('/auth', authRoutes);
+app.use('/oauth', oauthRedirectRouter);
 app.use('/sos', sosLimiter, sosRoutes(io));
 app.use('/upload', uploadRoutes);
 

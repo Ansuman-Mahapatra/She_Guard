@@ -47,4 +47,10 @@ module.exports = {
   JWT_SECRET: process.env.JWT_SECRET || 'sheguard-dev-secret-change-in-production',
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '30d',
   SESSION_INACTIVITY_DAYS: parseInt(process.env.SESSION_INACTIVITY_DAYS || '30', 10),
+
+  // Google OAuth (victim/guardian sign-in; must match Web client ID used by mobile)
+  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || '',
+  GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || '',
+  // HTTPS base for OAuth redirect (e.g. https://api.sheguard.com). When set, app uses this domain for redirect; add these URLs to Google Console.
+  OAUTH_REDIRECT_HTTPS_BASE: process.env.OAUTH_REDIRECT_HTTPS_BASE || '',
 };

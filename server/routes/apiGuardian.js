@@ -67,6 +67,65 @@ router.post('/link-by-code', requireAuth, requireRole('guardian'), async (req, r
   }
 });
 
+// POST /api/guardian/link-by-email
+// Victim adds a Guardian by their Google-verified email address
+router.post('/link-by-email', requireAuth, requireRole('victim'), async (req, res) => {
+  try {
+    const { email, relationship } = req.body;
+    if (!email) return res.status(400).json({ message: 'Guardian email required' });
+    
+    // Find the guardian by email
+    const guardian = await User.findOne({ email: email.toLowerCase(), role: 'guardian' });
+    if (!guardian) {
+      return res.status(404).json({ message: 'No Guardian found with this email. Ask them to sign in to SheGuard first.' });
+    }
+
+    // Check if already linked
+    const existing = await GuardianRelationship.findOne({
+      victimUserId: req.user._id,
+      guardianUserId: guardian._id,
+    });
+    if (existing) return res.status(409).json({ message: 'Already linked to this Guardian' });
+
+    const isFirst = (await GuardianRelationship.countDocuments({ victimUserId: req.user._id })) === 0;
+
+    // Create Relationship
+    const rel = new GuardianRelationship({
+      victimUserId: req.user._id,
+      guardianUserId: guardian._id,
+      relationship: relationship || 'Guardian',
+      isPrimary: isFirst,
+      linkedBy: 'email',
+    });
+    await rel.save();
+
+    // Update Victim
+    req.user.guardians = req.user.guardians || [];
+    req.user.guardians.push({
+      guardianUserId: guardian._id,
+      guardianName: guardian.name,
+      guardianEmail: guardian.email,
+      guardianPhone: guardian.phone,
+      relationship: rel.relationship,
+      isPrimary: isFirst,
+    });
+    await req.user.save();
+
+    // Update Guardian
+    guardian.protectedMembers = guardian.protectedMembers || [];
+    guardian.protectedMembers.push({
+      victimUserId: req.user._id,
+      victimName: req.user.name,
+      relationship: rel.relationship,
+    });
+    await guardian.save();
+
+    res.json({ message: 'Successfully linked to Guardian.', guardianName: guardian.name });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // GET /api/guardian/emergencies
 router.get('/emergencies', requireAuth, requireRole('guardian'), async (req, res) => {
   try {

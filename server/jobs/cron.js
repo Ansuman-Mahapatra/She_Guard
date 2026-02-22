@@ -77,17 +77,44 @@ async function checkInProcessor() {
 }
 
 async function missedHeartbeatMonitor() {
-  const threeMinutesAgo = new Date(Date.now() - 3 * 60 * 1000);
-  await UserStatus.updateMany(
-    { lastHeartbeat: { $lt: threeMinutesAgo } },
-    { $inc: { missedHeartbeats: 1 } }
-  );
+  const fortyFiveSecondsAgo = new Date(Date.now() - 45 * 1000);
+  
+  try {
+    // Find victims who were online but haven't sent a heartbeat in 45 seconds
+    const lostVictims = await User.find({
+      role: 'victim',
+      'lastKnownLocation.status': 'online',
+      lastHeartbeatAt: { $lt: fortyFiveSecondsAgo }
+    });
+
+    for (const victim of lostVictims) {
+      victim.lastKnownLocation.status = 'yellow_alert';
+      await victim.save();
+      
+      console.log(`[cron] ⚠️ Signal lost detected for ${victim.name}. Triggering Yellow Alert.`);
+
+      const guardians = victim.guardians || [];
+      const guardianTokenIds = guardians.map(g => g.guardianUserId);
+      const guardianUsers = await User.find({ _id: { $in: guardianTokenIds }, fcmToken: { $exists: true } });
+      
+      for (const reqGuardian of guardianUsers) {
+        if (reqGuardian.fcmToken) {
+          fcm.sendToDevice(reqGuardian.fcmToken, {
+            title: `📶 Signal Lost: ${victim.name}`,
+            body: `${victim.name} went offline or lost signal. Last seen 45 seconds ago. Check their location immediately.`,
+          }, { type: 'yellow_alert', victimId: victim._id.toString() }).catch(err => console.error(err));
+        }
+      }
+    }
+  } catch (err) {
+    console.error("[cron] Error running heartbeat monitor:", err);
+  }
 }
 
 function startCron(io) {
   setInterval(sessionCleanup, 24 * 60 * 60 * 1000);
   setInterval(checkInProcessor, 60 * 1000);
-  setInterval(missedHeartbeatMonitor, 2 * 60 * 1000);
+  setInterval(missedHeartbeatMonitor, 15 * 1000); // Check every 15 seconds
   console.log('[cron] Background jobs started');
 }
 

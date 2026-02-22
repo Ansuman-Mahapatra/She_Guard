@@ -5,6 +5,8 @@ const Dispatch = require('../models/Dispatch');
 const LocationHistory = require('../models/LocationHistory');
 const User = require('../models/User');
 const { generateDispatchId } = require('../utils/idGenerator');
+const Evidence = require('../models/Evidence');
+const mongoose = require('mongoose');
 
 const router = express.Router();
 
@@ -202,6 +204,41 @@ router.post('/unit/status', async (req, res) => {
     res.json(dispatch);
   } catch (err) {
     res.status(500).json({ message: err.message });
+  }
+});
+
+// GET /api/police/evidence/list/:emergencyId
+router.get('/evidence/list/:emergencyId', async (req, res) => {
+  try {
+    const emergency = await Emergency.findOne({ emergencyId: req.params.emergencyId });
+    if (!emergency) return res.status(404).json({ message: 'Emergency not found' });
+    const list = await Evidence.find({ emergencyId: emergency._id }).lean();
+    res.json(list);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// GET /api/police/evidence/download/:evidenceId
+router.get('/evidence/download/:evidenceId', async (req, res) => {
+  try {
+    const evidence = await Evidence.findOne({ evidenceId: req.params.evidenceId });
+    if (!evidence) return res.status(404).json({ message: 'Evidence not found' });
+    
+    const bucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, { bucketName: 'evidence' });
+    const downloadStream = bucket.openDownloadStream(evidence.gridFSFileId);
+    
+    res.set('Content-Type', evidence.mimeType || 'application/octet-stream');
+    res.set('Content-Disposition', `inline; filename="${evidence.fileName}"`);
+    
+    downloadStream.on('error', (err) => {
+      console.error('[gridfs] Error streaming file:', err);
+      if (!res.headersSent) res.status(500).json({ message: 'Error streaming file' });
+    });
+    
+    downloadStream.pipe(res);
+  } catch (err) {
+    if (!res.headersSent) res.status(500).json({ message: err.message });
   }
 });
 

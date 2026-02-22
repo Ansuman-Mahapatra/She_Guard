@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const { OAuth2Client } = require('google-auth-library');
 const User = require('../models/User');
 const Session = require('../models/Session');
 const config = require('../config');
@@ -9,6 +10,34 @@ const { requireAuth } = require('../middleware/auth');
 const fcm = require('../services/fcm');
 const mail = require('../services/mail');
 const { isValidEmail } = require('../utils/validate');
+
+const googleClient = config.GOOGLE_CLIENT_ID
+  ? new OAuth2Client(config.GOOGLE_CLIENT_ID)
+  : null;
+const { consumeOneTimeCode } = require('./oauthRedirect');
+
+/** Create session and JWT for a user (used by Google login so heartbeat/APIs work). */
+async function createSessionAndToken(user, deviceId = 'mobile') {
+  const existingSessions = await Session.find({ userId: user._id, isActive: true });
+  for (const s of existingSessions) {
+    await Session.updateOne({ _id: s._id }, { isActive: false });
+  }
+  const expiresAt = new Date(Date.now() + INACTIVITY_MS);
+  const session = new Session({
+    userId: user._id,
+    deviceId,
+    deviceName: 'Mobile',
+    expiresAt,
+  });
+  await session.save();
+  await User.updateOne({ _id: user._id }, { lastLoginAt: new Date() });
+  const token = jwt.sign(
+    { userId: user._id.toString(), deviceId, sessionId: session._id.toString() },
+    config.JWT_SECRET,
+    { expiresIn: config.JWT_EXPIRES_IN }
+  );
+  return { token, session, expiresAt };
+}
 
 const router = express.Router();
 const INACTIVITY_MS = config.SESSION_INACTIVITY_DAYS * 24 * 60 * 60 * 1000;
@@ -326,6 +355,129 @@ router.delete('/sessions/:sessionId', requireAuth, async (req, res) => {
     res.json({ message: 'Session ended' });
   } catch (err) {
     res.status(500).json({ message: err.message });
+  }
+});
+
+// POST /api/auth/google — victim/guardian sign-in with Google id_token or oneTimeCode (from HTTPS redirect flow)
+router.post('/google', async (req, res) => {
+  if (!googleClient) {
+    return res.status(503).json({ message: 'Google sign-in is not configured. Set GOOGLE_CLIENT_ID in .env.' });
+  }
+  try {
+    const { idToken: idTokenRaw, oneTimeCode, role, phone } = req.body;
+    let idToken = idTokenRaw;
+    if (oneTimeCode) {
+      idToken = consumeOneTimeCode(oneTimeCode);
+      if (!idToken) {
+        return res.status(400).json({ message: 'Invalid or expired one-time code. Please sign in again.' });
+      }
+    }
+    if (!idToken) {
+      return res.status(400).json({ message: 'idToken or oneTimeCode is required' });
+    }
+
+    const ticket = await googleClient.verifyIdToken({
+      idToken,
+      audience: config.GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+    const email = payload.email;
+    const name = payload.name;
+    const googleId = payload.sub;
+
+    let user = await User.findOne({ email });
+
+    if (user) {
+      console.log('[auth] User logged in via Google:', email);
+      const { token, session, expiresAt } = await createSessionAndToken(user);
+      return res.json({
+        token,
+        ...user.toObject(),
+        sessionId: session._id,
+        expiresAt,
+      });
+    }
+
+    if (!role || !phone) {
+      const signupToken = jwt.sign(
+        { email, name, purpose: 'google-signup' },
+        config.JWT_SECRET,
+        { expiresIn: '10m' }
+      );
+      return res.status(400).json({
+        message: 'Account not found. Please provide phone and role to complete registration.',
+        email,
+        name,
+        signupToken,
+      });
+    }
+
+    const validRoles = ['victim', 'guardian', 'pcr'];
+    if (!validRoles.includes(role)) {
+      return res.status(400).json({ message: 'role must be victim, guardian, or pcr' });
+    }
+
+    user = new User({
+      name,
+      email,
+      phone,
+      role,
+      googleId,
+      emailVerified: true,
+    });
+
+    await user.save();
+    console.log('[auth] User registered via Google:', email);
+    const { token, session, expiresAt } = await createSessionAndToken(user);
+    res.json({
+      token,
+      ...user.toObject(),
+      sessionId: session._id,
+      expiresAt,
+    });
+  } catch (err) {
+    console.error('[auth] Google auth error:', err);
+    res.status(500).json({ message: 'Invalid or expired Google Token.' });
+  }
+});
+
+// POST /api/auth/google-complete — complete Google signup with signupToken (from HTTPS redirect flow)
+router.post('/google-complete', async (req, res) => {
+  try {
+    const { signupToken, phone, role } = req.body;
+    if (!signupToken || !phone || !role) {
+      return res.status(400).json({ message: 'signupToken, phone, and role are required' });
+    }
+    const payload = jwt.verify(signupToken, config.JWT_SECRET);
+    if (payload.purpose !== 'google-signup' || !payload.email || !payload.name) {
+      return res.status(400).json({ message: 'Invalid signup token' });
+    }
+    const validRoles = ['victim', 'guardian', 'pcr'];
+    if (!validRoles.includes(role)) {
+      return res.status(400).json({ message: 'role must be victim, guardian, or pcr' });
+    }
+    const existing = await User.findOne({ email: payload.email });
+    if (existing) {
+      const { token, session, expiresAt } = await createSessionAndToken(existing);
+      return res.json({ token, ...existing.toObject(), sessionId: session._id, expiresAt });
+    }
+    const user = new User({
+      name: payload.name,
+      email: payload.email,
+      phone: phone.trim(),
+      role,
+      emailVerified: true,
+    });
+    await user.save();
+    console.log('[auth] User registered via Google (signupToken):', payload.email);
+    const { token, session, expiresAt } = await createSessionAndToken(user);
+    res.json({ token, ...user.toObject(), sessionId: session._id, expiresAt });
+  } catch (err) {
+    if (err.name === 'TokenExpiredError') {
+      return res.status(400).json({ message: 'Signup link expired. Please sign in with Google again.' });
+    }
+    res.status(500).json({ message: err.message || 'Invalid signup token.' });
   }
 });
 

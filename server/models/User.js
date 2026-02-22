@@ -57,6 +57,19 @@ const userSchema = new mongoose.Schema({
     push: { type: Boolean, default: true },
   },
 
+  // FCM Device Token for Push Notifications
+  fcmToken: { type: String },
+
+  // Location and Signal Tracking
+  lastKnownLocation: {
+    lat: { type: Number },
+    lng: { type: Number },
+    battery: { type: Number }, // 0 to 100
+    signalStrength: { type: Number }, // e.g. 0 to 4
+    status: { type: String, enum: ['online', 'offline', 'alert', 'yellow_alert'], default: 'offline' },
+    updatedAt: { type: Date }
+  },
+
   // Status
   isActive: { type: Boolean, default: true },
   isVerified: { type: Boolean, default: true },
