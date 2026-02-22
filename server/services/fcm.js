@@ -10,24 +10,45 @@ let messaging = null;
 
 function init() {
   if (messaging) return messaging;
-  const keyPath = config.FIREBASE_SERVICE_ACCOUNT_PATH;
-  if (!keyPath) {
-    console.log('[fcm] No FIREBASE_SERVICE_ACCOUNT_PATH — push disabled');
-    return null;
-  }
-  const absolutePath = path.isAbsolute(keyPath)
-    ? keyPath
-    : path.resolve(__dirname, '..', '..', keyPath);
-  try {
-    const serviceAccount = require(absolutePath);
-    if (!admin) {
-      admin = require('firebase-admin');
+
+  let serviceAccount = null;
+
+  // Option 1: JSON string in env variable → used on Render / any cloud host
+  if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+    try {
+      serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+      console.log('[fcm] Using FIREBASE_SERVICE_ACCOUNT_JSON env variable');
+    } catch (e) {
+      console.warn('[fcm] Failed to parse FIREBASE_SERVICE_ACCOUNT_JSON:', e.message);
     }
+  }
+
+  // Option 2: File path → used locally in development
+  if (!serviceAccount) {
+    const keyPath = config.FIREBASE_SERVICE_ACCOUNT_PATH;
+    if (!keyPath) {
+      console.log('[fcm] No Firebase credentials — push notifications disabled');
+      return null;
+    }
+    const absolutePath = path.isAbsolute(keyPath)
+      ? keyPath
+      : path.resolve(__dirname, '..', '..', keyPath);
+    try {
+      serviceAccount = require(absolutePath);
+      console.log('[fcm] Initialized with service account file:', keyPath);
+    } catch (err) {
+      console.warn('[fcm] Could not load service account file (push disabled):', err.message);
+      return null;
+    }
+  }
+
+  try {
+    if (!admin) admin = require('firebase-admin');
     if (!admin.apps.length) {
       admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
     }
     messaging = admin.messaging();
-    console.log('[fcm] Initialized with service account:', keyPath);
+    console.log('[fcm] Firebase initialized successfully');
     return messaging;
   } catch (err) {
     console.warn('[fcm] Init failed (push disabled):', err.message);
