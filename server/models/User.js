@@ -22,6 +22,7 @@ const userSchema = new mongoose.Schema({
   phone: { type: String }, // required for victim/guardian
   email: { type: String },
   password: { type: String }, // hashed; required for guardian, optional for victim, required for pcr
+  googleId: { type: String }, // Google OAuth subject ID (sub), set on Google sign-in
   role: { type: String, enum: ['victim', 'guardian', 'pcr'], required: true },
 
   // Station details (for role = pcr)

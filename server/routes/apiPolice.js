@@ -10,6 +10,22 @@ const router = express.Router();
 
 // PCR has full access without login — public dashboard
 
+// GET /api/police/stats
+router.get('/stats', async (req, res) => {
+  try {
+    // We send back simulated metrics for the PCR Dashboard 
+    // Usually these come from officer databases and fleet tables
+    res.json({
+      onDutyOfficers: 245,
+      availableUnits: 85,
+      avgResponse: 4.2,
+      coverage: 94
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // GET /api/police/map — combines new Emergency + legacy EmergencySession
 router.get('/map', async (req, res) => {
   try {

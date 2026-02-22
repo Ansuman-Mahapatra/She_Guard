@@ -30,3 +30,9 @@ export function getReportUrl(sessionId: string): string {
 export function getMapsUrl(lat: number, lng: number): string {
   return `https://www.google.com/maps?q=${lat},${lng}`;
 }
+
+export async function fetchPoliceStats() {
+  const res = await fetch(`${API_URL}/api/police/stats`);
+  if (!res.ok) throw new Error(`Failed to fetch stats: ${res.status}`);
+  return res.json();
+}

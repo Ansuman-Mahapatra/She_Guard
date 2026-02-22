@@ -1,9 +1,17 @@
 import { Siren, ShieldAlert, Users, Car, Clock, MapPin } from "lucide-react";
 import type { Emergency } from "@/data/mockData";
 
+export interface PoliceStats {
+  onDutyOfficers: number;
+  availableUnits: number;
+  avgResponse: string | number;
+  coverage: string | number;
+}
+
 interface TopStatsBarProps {
   emergencies: Emergency[];
   loading?: boolean;
+  policeStats?: PoliceStats | null;
 }
 
 const variantStyles = {
@@ -13,17 +21,17 @@ const variantStyles = {
   success: "bg-success/15 text-success border-success/30",
 };
 
-const TopStatsBar = ({ emergencies, loading }: TopStatsBarProps) => {
+const TopStatsBar = ({ emergencies, loading, policeStats }: TopStatsBarProps) => {
   const activeCount = emergencies.filter((e) => e.status === "active").length;
   const highPriorityCount = emergencies.filter((e) => e.priority === "high").length;
 
   const stats = [
     { label: "Active Emergencies", value: loading ? "—" : activeCount, icon: Siren, variant: "danger" as const },
     { label: "High Priority", value: loading ? "—" : highPriorityCount, icon: ShieldAlert, variant: "warning" as const },
-    { label: "On Duty Officers", value: "—", icon: Users, variant: "info" as const },
-    { label: "Available Units", value: "—", icon: Car, variant: "success" as const },
-    { label: "Avg Response", value: "— min", icon: Clock, variant: "info" as const },
-    { label: "Coverage", value: "—%", icon: MapPin, variant: "success" as const },
+    { label: "On Duty Officers", value: policeStats ? policeStats.onDutyOfficers : "—", icon: Users, variant: "info" as const },
+    { label: "Available Units", value: policeStats ? policeStats.availableUnits : "—", icon: Car, variant: "success" as const },
+    { label: "Avg Response", value: policeStats ? `${policeStats.avgResponse} min` : "— min", icon: Clock, variant: "info" as const },
+    { label: "Coverage", value: policeStats ? `${policeStats.coverage}%` : "—%", icon: MapPin, variant: "success" as const },
   ];
 
   return (
