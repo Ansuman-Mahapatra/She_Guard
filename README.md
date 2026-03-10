@@ -1,269 +1,361 @@
-# Intelligent Emergency Response System
 
-A hackathon project that connects **victims** in distress with **guardians** and a **Police Control Room (PCR)** dashboard in real time. It uses GPS, location streaming, risk scoring, tamper detection, push notifications, and optional image upload and email alerts.
+<div align="center">
 
----
+# 🚨 IERS — Intelligent Emergency Response System
 
-## Features
+> *Because every second in an emergency counts.*
 
-- **Victim app**: One-tap SOS with context (physical attack, forced vehicle, medical, etc.), live location streaming, risk score display, tamper detection, and “I’m Safe” resolution.
-- **Guardian app**: Live list of active emergencies, risk-level cards, “Respond Now” (opens Google Maps to last location), and optional push/email alerts.
-- **PCR dashboard**: Real-time session cards, risk sorting, tamper alerts, duration, and PDF incident report download.
-- **Backend**: REST API + Socket.IO for real-time updates; MongoDB; risk engine; tamper watch (device offline >20s); FCM push (Firebase key file); optional email (Gmail) and Cloudinary image upload.
-
----
-
-## Platform split & tech stack
-
-| Platform        | Stack                    | Folder           |
-|----------------|--------------------------|------------------|
-| Victim app     | React Native (Expo)      | `/mobile-victim` |
-| Guardian app   | React Native (Expo)      | `/mobile-guardian` |
-| PCR dashboard  | React (Vite) + Tailwind  | `/web-pcr`       |
-| Backend        | Node.js + Express        | `/server`        |
+[![Status](https://img.shields.io/badge/status-hackathon%20ready-brightgreen?style=for-the-badge)](.)
+[![Stack](https://img.shields.io/badge/stack-React%20Native%20%7C%20Node.js%20%7C%20MongoDB-blue?style=for-the-badge)](.)
+[![Realtime](https://img.shields.io/badge/realtime-Socket.IO-black?style=for-the-badge&logo=socket.io)](.)
+[![License](https://img.shields.io/badge/license-Private%20%2F%20Hackathon-orange?style=for-the-badge)](.)
 
 ---
 
-## Project structure
+**Victim presses SOS → GPS locks on → Risk engine fires → Guardian responds → PCR sees everything. Live.**
+
+</div>
+
+---
+
+## 🗺️ What Is This?
+
+Imagine a woman boards the wrong cab. Her phone is in her pocket.  
+She presses **one button**.
+
+That single tap triggers a cascade:
+
+- 📍 Her **live location** streams to guardians and police
+- 🧠 A **risk engine** scores the danger in real time
+- 🔔 **Guardians** get a push notification with a "Respond Now" button
+- 🖥️ The **Police Control Room** sees a live dashboard — risk-sorted, tamper-aware
+- 📄 When it's over, a full **PDF incident report** downloads in one click
+
+No login dance. No menus. One tap.
+
+---
+
+## ⚡ Live Demo Flow
+
+```
+[ Victim taps SOS ]
+       │
+       ▼
+  Backend creates session ──────────────────────────────────────┐
+       │                                                         │
+       ▼                                                         ▼
+  Location streams every few seconds              Socket.IO broadcasts to:
+  Risk score recalculates live                    ├── 📱 Guardian App
+  Tamper watch starts (20s offline = alert)       └── 🖥️  PCR Dashboard
+       │
+       ▼
+  Victim taps "I'm Safe" ──► session_resolved emitted ──► cards disappear
+```
+
+> **Tamper Detection:** If the victim's device goes silent for >20 seconds,  
+> every connected screen fires a red `🚨 TAMPER ALERT` automatically.
+
+---
+
+## 🏗️ Platform Split
+
+| 🎯 Who | 📱 App | ⚙️ Stack | 📁 Folder |
+|--------|--------|----------|----------|
+| Victim | Mobile | React Native (Expo) | `/mobile-victim` |
+| Guardian | Mobile | React Native (Expo) | `/mobile-guardian` |
+| Police (PCR) | Web | React + Vite + Tailwind | `/web-pcr` |
+| Brain | Server | Node.js + Express + Socket.IO | `/server` |
+
+---
+
+## 🧠 Risk Engine — How Danger Gets Scored
+
+Every location update triggers a re-score. Here's the math:
+
+```
+Base Score:  30
+
++ Context Type
+  ├── Physical Attack   → +30
+  ├── Forced Vehicle    → +25
+  ├── Medical           → +10
+  └── Other             → +5
+
++ Live Signals
+  ├── Speed > 50 km/h         → +15
+  ├── Sudden speed change      → +10
+  ├── Sharp direction shift    → +10
+  ├── High audio level         → +10
+  └── Tamper detected          → +20
+
+──────────────────────────────
+Final Score: clamped 0 → 100
+
+🟡 MODERATE   → score < 40
+🟠 HIGH       → score 40–69
+🔴 CRITICAL   → score ≥ 70
+```
+
+---
+
+## 📁 Project Structure
 
 ```
 /
-├── .env                    # Your secrets (copy from .env.example)
-├── .env.example            # Template for all env variables
-├── firebase-key.json       # Firebase service account (place at root; gitignored)
-├── package.json            # Root scripts (e.g. npm run sync-env)
-├── scripts/
-│   └── sync-env-to-mobile.js   # Pushes .env values into mobile apps
-├── server/
-│   ├── config.js           # Loads .env and exports config
-│   ├── server.js           # Express + Socket.IO + MongoDB
-│   ├── models/
+├── 📄 .env                         ← Your secrets (copy from .env.example)
+├── 📄 .env.example                 ← Template — start here
+├── 🔑 firebase-key.json            ← FCM service account (gitignored)
+├── 📄 package.json                 ← Root scripts
+│
+├── 📂 scripts/
+│   └── sync-env-to-mobile.js       ← Pushes .env into both mobile apps
+│
+├── 📂 server/
+│   ├── server.js                   ← Express + Socket.IO + MongoDB
+│   ├── config.js                   ← Loads .env
+│   ├── 📂 models/
 │   │   ├── User.js
 │   │   └── EmergencySession.js
-│   ├── routes/
-│   │   ├── auth.js         # POST /auth/register, /auth/login
-│   │   ├── sos.js          # POST/GET /sos/* (start, update, resolve, active, report)
-│   │   └── upload.js       # POST /upload/cloudinary, GET /upload/config
-│   └── services/
-│       ├── riskEngine.js   # Risk score from context + location + tamper
-│       ├── tamperDetector.js  # 10s interval; marks tamper if no location >20s
-│       ├── fcm.js          # Firebase Admin (push) via service account JSON
-│       └── mail.js         # SMTP (Gmail) for guardian alerts
-├── mobile-victim/
+│   ├── 📂 routes/
+│   │   ├── auth.js                 ← Register / Login
+│   │   ├── sos.js                  ← SOS lifecycle
+│   │   └── upload.js               ← Cloudinary image upload
+│   └── 📂 services/
+│       ├── riskEngine.js           ← Score calculation
+│       ├── tamperDetector.js       ← 10s interval watcher
+│       ├── fcm.js                  ← Firebase push via service account
+│       └── mail.js                 ← Gmail SMTP alerts
+│
+├── 📂 mobile-victim/
 │   └── src/
-│       ├── config/config.js    # Generated by npm run sync-env
-│       ├── screens/
-│       │   ├── HomeScreen.tsx   # Name + SOS button + context modal
-│       │   └── SOSActiveScreen.tsx  # Location stream, risk, “I’m Safe”
-│       └── App (navigation)
-├── mobile-guardian/
+│       ├── config/config.js        ← Auto-generated by sync-env
+│       └── screens/
+│           ├── HomeScreen.tsx      ← Name + SOS button + context picker
+│           └── SOSActiveScreen.tsx ← Live location, risk badge, "I'm Safe"
+│
+├── 📂 mobile-guardian/
 │   └── src/
 │       ├── config/config.js
 │       └── screens/
-│           └── AlertsScreen.tsx   # Active alerts, Respond Now (opens Maps)
-├── web-pcr/
+│           └── AlertsScreen.tsx    ← Risk cards + Respond Now → Google Maps
+│
+├── 📂 web-pcr/
 │   └── src/
 │       ├── services/socket.js
-│       ├── pages/PCRDashboard.jsx
+│       ├── pages/PCRDashboard.jsx  ← Live session cards, PDF download
 │       └── App.jsx
-└── README.md
+│
+└── 📄 README.md
 ```
 
 ---
 
-## Prerequisites
+## 🔌 API Reference
 
-- **Node.js** (v18+)
-- **MongoDB** (local or Atlas)
-- **Expo Go** on phone (or Android/iOS simulators) for mobile apps
-- (Optional) **Firebase** project + service account JSON for push
-- (Optional) **Gmail** app password for email alerts
-- (Optional) **Cloudinary** account for image upload
+**Base URL:** `http://localhost:5000` *(or your `API_URL`)*
+
+### 🔐 Auth
+
+| Method | Endpoint | Body | What it does |
+|--------|----------|------|--------------|
+| `POST` | `/auth/register` | `{ name, phone, role }` | Creates user — role: `victim` / `guardian` / `pcr` |
+| `POST` | `/auth/login` | `{ phone }` | Returns user; 404 if not found |
+
+### 🆘 SOS
+
+| Method | Endpoint | Body | What it does |
+|--------|----------|------|--------------|
+| `POST` | `/sos/start` | `{ victimName, contextType }` | Starts session → emits `new_sos` |
+| `POST` | `/sos/update/:sessionId` | `{ lat, lng, speed, direction, audioLevel }` | Streams location → recomputes risk → emits `session_update` |
+| `POST` | `/sos/resolve/:sessionId` | — | Marks safe → emits `session_resolved` |
+| `GET` | `/sos/active` | — | All active sessions, sorted by risk ↓ |
+| `GET` | `/sos/report/:sessionId` | — | 📄 PDF incident report download |
+
+### 📸 Upload
+
+| Method | Endpoint | Body | What it does |
+|--------|----------|------|--------------|
+| `POST` | `/upload/cloudinary` | multipart: `image`, optional `sessionId` | Uploads image; attaches URL to session |
+| `GET` | `/upload/config` | — | Returns Cloudinary config (no secret) |
 
 ---
 
-## Environment setup
+## ⚡ Socket.IO Events
 
-### 1. Copy and fill `.env`
+> All clients connect to the same backend. Events fire to **everyone**.
 
-From the project root:
+| Event | Direction | Payload | Trigger |
+|-------|-----------|---------|---------|
+| `new_sos` | Server → All | Session object | Victim taps SOS |
+| `session_update` | Server → All | Session object | New location / risk change |
+| `tamper_alert` | Server → All | `{ sessionId, riskScore, riskLevel }` | Device silent >20s |
+| `session_resolved` | Server → All | `{ sessionId }` | Victim taps "I'm Safe" |
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+Before you touch anything, make sure you have:
+
+- ✅ **Node.js v18+**
+- ✅ **MongoDB** (local `mongod` or Atlas cluster)
+- ✅ **Expo Go** on a phone (or an Android/iOS simulator)
+- ⬜ Firebase service account JSON *(optional — for push)*
+- ⬜ Gmail app password *(optional — for email alerts)*
+- ⬜ Cloudinary account *(optional — for image upload)*
+
+---
+
+### Step 1 — Clone & Configure
 
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env` with your values. All apps read from this single file (mobile config is synced via script).
+Open `.env` and fill it in:
 
-### 2. Environment variables reference
+| Variable | Required? | What to put |
+|----------|-----------|-------------|
+| `MONGODB_URI` | ✅ Yes | `mongodb://localhost:27017/emergency_db` or Atlas URI |
+| `PORT` | No | Default `5000` |
+| `API_URL` | ✅ Yes | `http://<YOUR_LAN_IP>:5000` when using a real phone |
+| `VITE_API_URL` | ✅ Yes | Same as above (for PCR web app) |
+| `FIREBASE_SERVICE_ACCOUNT_PATH` | For push | `firebase-key.json` |
+| `FIREBASE_PROJECT_ID` | Optional | Your Firebase project ID |
+| `VITE_FIREBASE_MESSAGING_SENDER_ID` | Optional | FCM sender ID |
+| `MAIL_USERNAME` | For email | Your Gmail address |
+| `MAIL_PASSWORD` | For email | Gmail app password |
+| `GUARDIAN_ALERT_EMAIL` | Optional | Email to receive alerts |
+| `CLOUDINARY_CLOUD_NAME` | For upload | Your Cloudinary cloud name |
+| `CLOUDINARY_UPLOAD_PRESET` | For upload | Unsigned preset name |
+| `CLOUDINARY_API_KEY` | Optional | Server-side upload |
+| `CLOUDINARY_API_SECRET` | For upload | Cloudinary secret |
+| `TWILIO_*` | Optional | Account SID, Auth Token, Phone number |
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| **MONGODB_URI** | Yes | MongoDB connection string. Use database `emergency_db` (e.g. `.../emergency_db?retryWrites=...`). |
-| **PORT** | No | Server port (default `5000`). |
-| **API_URL** | Yes | Backend URL (e.g. `http://localhost:5000`). Use your machine’s LAN IP when testing mobile on device. |
-| **VITE_API_URL** | Yes | Same as API_URL for the PCR web app. |
-| **FIREBASE_SERVICE_ACCOUNT_PATH** | For push | Path to Firebase service account JSON (e.g. `firebase-key.json` at project root). |
-| **FIREBASE_PROJECT_ID** | Optional | Firebase project ID. |
-| **VITE_FIREBASE_MESSAGING_SENDER_ID** | Optional | FCM sender ID (synced to mobile for client SDK). |
-| **MAIL_USERNAME** | For email | Gmail address (or SMTP user). |
-| **MAIL_PASSWORD** | For email | Gmail app password or SMTP password. |
-| **GUARDIAN_ALERT_EMAIL** | Optional | Email to receive SOS and tamper alerts. |
-| **GOOGLE_MAPS_API_KEY** | Optional | Not required for “Respond Now” (uses maps URL). Set only for in-app maps/geocoding. |
-| **MAPBOX_ACCESS_TOKEN** | Optional | Alternative to Google Maps. |
-| **CLOUDINARY_CLOUD_NAME** | For upload | Cloudinary cloud name. |
-| **CLOUDINARY_UPLOAD_PRESET** | For upload | Unsigned upload preset name. |
-| **CLOUDINARY_API_KEY** | Optional | For server-side upload. |
-| **CLOUDINARY_API_SECRET** | For upload | For server-side Cloudinary upload. |
-| **UPLOAD_API_URL** | Optional | Override Cloudinary upload URL (e.g. `https://api.cloudinary.com/v1_1/<cloud>/image/upload`). |
-| **TWILIO_*** | Optional | For SMS alerts (account SID, auth token, phone number). |
+> 💡 **Using a physical phone?** Replace `localhost` with your machine's LAN IP  
+> (e.g. `http://192.168.1.5:5000`). Both devices must be on the same WiFi.
 
-### 3. Firebase key file (for FCM push)
+---
 
-1. In [Firebase Console](https://console.firebase.google.com/) → Project Settings → Service accounts.
-2. Generate a new private key and download the JSON file.
-3. Save it as `firebase-key.json` at the **project root** (same level as `server/`, `mobile-victim/`).
-4. Set in `.env`: `FIREBASE_SERVICE_ACCOUNT_PATH=firebase-key.json` (or your path).
+### Step 2 — Firebase Setup *(for push notifications)*
 
-The file is gitignored; do not commit it.
+1. Open [Firebase Console](https://console.firebase.google.com/) → your project
+2. Go to **Project Settings → Service Accounts**
+3. Click **"Generate new private key"** → download the JSON
+4. Save it as `firebase-key.json` at the **project root**
+5. Set in `.env`: `FIREBASE_SERVICE_ACCOUNT_PATH=firebase-key.json`
 
-### 4. Sync env to mobile apps
+> 🔒 `firebase-key.json` is gitignored. Never commit it.
 
-After changing `.env` (especially `API_URL` or Firebase sender ID), run:
+---
+
+### Step 3 — Sync env to mobile apps
+
+After editing `.env`, run this once from the project root:
 
 ```bash
 npm run sync-env
 ```
 
-This updates `mobile-victim/src/config/config.js` and `mobile-guardian/src/config/config.js` with `BASE_URL`, `GOOGLE_MAPS_API_KEY`, `MAPBOX_ACCESS_TOKEN`, and `FIREBASE_MESSAGING_SENDER_ID`.
+This auto-generates `config.js` inside both mobile apps with `BASE_URL`, Maps keys, and Firebase sender ID baked in.
 
 ---
 
-## Installation & run
+### Step 4 — Fire everything up
 
-Use the same WiFi for server and physical devices. Replace `API_URL` / `VITE_API_URL` with your machine’s IP when needed (e.g. `http://192.168.1.5:5000`).
-
-### 1. MongoDB
-
-- **Local**: start MongoDB (e.g. `mongod`).
-- **Atlas**: ensure `.env` has the correct `MONGODB_URI` with `emergency_db` and that your IP is allowed.
-
-### 2. Backend
+Open **5 terminals**. Run them in this order:
 
 ```bash
-cd server
-npm install
-npm start
+# Terminal 1 — MongoDB (if local)
+mongod
+
+# Terminal 2 — Backend
+cd server && npm install && npm start
+# ✅ You should see: "MongoDB connected" + "Server running on port 5000"
+
+# Terminal 3 — PCR Dashboard
+cd web-pcr && npm install && npm run dev
+# ✅ Open: http://localhost:5173
+
+# Terminal 4 — Victim App
+cd mobile-victim && npm install && npx expo start
+# ✅ Scan QR with Expo Go on your phone
+
+# Terminal 5 — Guardian App
+cd mobile-guardian && npm install && npx expo start
+# ✅ Scan QR on another device (or simulator)
 ```
 
-You should see “MongoDB connected” and “Server running on port 5000”.
+---
 
-### 3. PCR dashboard (web)
+## 🎬 Full Demo Walkthrough
 
-```bash
-cd web-pcr
-npm install
-npm run dev
+Follow this script to demo everything in under 3 minutes:
+
+```
+1. 🖥️  Open PCR Dashboard at http://localhost:5173 — it's empty, waiting.
+
+2. 📱  On Victim app:
+       → Enter your name
+       → Tap the big red SOS button
+       → Choose "Physical Attack"
+       → Watch the Active Session screen: timer starts, risk score appears
+
+3. 🖥️  On PCR Dashboard:
+       → A session card pops in — live!
+       → Risk score climbs as location updates stream in
+       → Card color shifts: yellow → orange → red
+
+4. 📱  On Guardian app:
+       → Alert card appears instantly
+       → Tap "Respond Now" → Google Maps opens at victim's last location
+
+5. ⏱️  Tamper test:
+       → Leave the Victim app idle for 20+ seconds
+       → Watch all three UIs flash: 🚨 TAMPER ALERT
+
+6. 📄  On PCR Dashboard:
+       → Click "Download Incident Report"
+       → Full PDF with session timeline downloads instantly
+
+7. 📱  On Victim app:
+       → Tap "I'm Safe"
+       → Session resolves — cards vanish from PCR and Guardian
 ```
 
-Open `http://localhost:5173`.
+---
 
-### 4. Victim app (Expo)
+## 🛡️ Optional Features At a Glance
 
-```bash
-cd mobile-victim
-npm install
-npx expo start
-```
+| Feature | What you need | What you get |
+|---------|--------------|-------------|
+| 🔔 Push Notifications | `firebase-key.json` + FCM config | Guardians notified on SOS + tamper |
+| 📧 Email Alerts | Gmail + app password | SOS and tamper emails to guardian |
+| 📸 Image Upload | Cloudinary account | Victim can attach photos to session |
+| 🗺️ In-app Maps | Google Maps API key | Geocoding and map rendering (Respond Now works without it) |
+| 📲 SMS Alerts | Twilio account | Text alerts to guardians |
 
-Scan the QR code with Expo Go (or press `a`/`i` for simulator). Ensure `BASE_URL` in config points to your backend (run `npm run sync-env` from root if needed).
-
-### 5. Guardian app (Expo)
-
-```bash
-cd mobile-guardian
-npm install
-npx expo start
-```
-
-Same as victim: scan QR or use simulator; ensure `BASE_URL` is correct.
+> **"Respond Now" works with zero API keys.** It opens `maps.google.com/?q=lat,lng` in the default maps app — no key required.
 
 ---
 
-## API endpoints
+## 🤝 Contributing
 
-Base URL: `http://localhost:5000` (or your `API_URL`).
+This is a hackathon project — built fast, built to impress.  
+If you're extending it:
 
-### Auth
-
-| Method | Endpoint | Body | Description |
-|--------|----------|------|-------------|
-| POST | `/auth/register` | `{ name, phone, role }` | Create user (`role`: `victim`, `guardian`, `pcr`). |
-| POST | `/auth/login` | `{ phone }` | Get user by phone; 404 if not found. |
-
-### SOS
-
-| Method | Endpoint | Body | Description |
-|--------|----------|------|-------------|
-| POST | `/sos/start` | `{ victimName, contextType }` | Start session; emits `new_sos`; returns `{ sessionId, _id }`. |
-| POST | `/sos/update/:sessionId` | `{ lat, lng, speed, direction, audioLevel }` | Append location; recompute risk; emit `session_update`. |
-| POST | `/sos/resolve/:sessionId` | — | Mark resolved; emit `session_resolved`. |
-| GET | `/sos/active` | — | List active sessions (sorted by risk descending). |
-| GET | `/sos/report/:sessionId` | — | PDF incident report (attachment). |
-
-### Upload
-
-| Method | Endpoint | Body | Description |
-|--------|----------|------|-------------|
-| POST | `/upload/cloudinary` | multipart: `image`; optional `sessionId` | Upload image; optionally attach URL to session. |
-| GET | `/upload/config` | — | Get Cloudinary config for client upload (no secret). |
+- Keep Socket.IO events in the table above updated
+- Run `npm run sync-env` after any `.env` change
+- Never commit `firebase-key.json` or `.env`
 
 ---
 
-## Socket.IO events
+<div align="center">
 
-All clients connect to the same backend URL (e.g. `http://localhost:5000`).
+Built with urgency, caffeine, and the belief that technology can save lives.
 
-| Event | Direction | Payload | Description |
-|-------|-----------|---------|-------------|
-| `new_sos` | Server → All | Session object | New SOS session created. |
-| `session_update` | Server → All | Session object | Session updated (e.g. new location, risk change). |
-| `tamper_alert` | Server → All | `{ sessionId, riskScore, riskLevel }` | Device offline >20s; tamper suspected. |
-| `session_resolved` | Server → All | `{ sessionId }` | Session resolved by victim. |
+**🚨 One tap. Real help. No delay.**
 
----
-
-## Demo flow
-
-1. Start MongoDB, then backend (`cd server && npm start`).
-2. Start PCR web (`cd web-pcr && npm run dev`) and open `http://localhost:5173`.
-3. Start Victim app (`cd mobile-victim && npx expo start`); open on device/simulator.
-4. Start Guardian app (`cd mobile-guardian && npx expo start`); open on another device/simulator.
-5. **Victim**: Enter name, tap SOS, choose e.g. “Physical Attack” → session starts; Active Session screen shows risk and timer.
-6. **PCR**: New session card appears; risk score updates as locations stream.
-7. **Guardian**: Alert card appears; tap “Respond Now” to open Google Maps at last location.
-8. **Tamper**: Leave Victim app idle for >20 seconds → tamper alert on all three UIs.
-9. **Report**: On PCR, click “Download Incident Report” → PDF with session details and timeline.
-10. **Victim**: Tap “I’m Safe” → session resolved; card disappears on PCR and Guardian.
-
----
-
-## Risk engine (summary)
-
-- Base score 30; extra by context (e.g. physical attack +30, forced vehicle +25, medical +10).
-- Speed >50 km/h, large speed/direction change, high audio level, and tamper add more.
-- Score clamped 0–100; levels: **MODERATE** (&lt;40), **HIGH** (40–69), **CRITICAL** (70+).
-
----
-
-## Optional features
-
-- **Maps**: `GOOGLE_MAPS_API_KEY` and `MAPBOX_ACCESS_TOKEN` are optional. “Respond Now” uses `https://maps.google.com/?q=lat,lng` without a key.
-- **FCM**: Requires `FIREBASE_SERVICE_ACCOUNT_PATH` and `firebase-key.json`. Push is sent to topic `guardians` on new SOS and tamper.
-- **Email**: Set `MAIL_USERNAME`, `MAIL_PASSWORD`, and `GUARDIAN_ALERT_EMAIL` to send SOS and tamper alerts via Gmail.
-- **Cloudinary**: Set Cloudinary vars and use `POST /upload/cloudinary` or client upload using `GET /upload/config`.
-
----
-
-## License
-
-Private / hackathon project. Use and modify as needed for your event.
+</div>
